@@ -1,11 +1,14 @@
 #!/bin/bash
 
 # Variables initialisation
-version="resetPrintingSystem v1.0 2015, Yvan Godard [godardyvan@gmail.com]"
+version="resetPrintingSystem v1.1 2015, Yvan Godard [godardyvan@gmail.com]"
 versionOSX=$(sw_vers -productVersion | awk -F '.' '{print $(NF-1)}')
 scriptDir=$(dirname "${0}")
 scriptName=$(basename "${0}")
 scriptNameWithoutExt=$(echo "${scriptName}" | cut -f1 -d '.')
+accountNotRemovePrintersQueues="root
+daemon
+nobody"
 
 function error () {
 	echo -e "\n*** Erreur ${1} ***"
@@ -29,6 +32,19 @@ shopt -s nullglob
 
 # suppression des PPD
 lpstat -p | cut -d' ' -f2 | xargs -I{} lpadmin -x {}
+
+# suppression des files d'attentes CUPS pour chaque utilisateur
+if [[ ! -z ${accountNotRemovePrintersQueues} ]]; then
+	for user in $(dscl . list /Users | grep -v "^_"); do
+		echo ${accountNotRemovePrintersQueues} | grep ${user} > /dev/null 2>&1
+		if [[ $? -ne 0 ]]; then
+			for printer in $(lpstat -U ${user} -a | awk '{print $1}'); do
+				echo ${printer}
+				lpadmin -U ${user} -x ${printer}
+			done
+		fi
+	done
+fi
 
 # réinitialisation des paramètres par défaut
 launchctl stop org.cups.cupsd 
